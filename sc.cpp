@@ -3,159 +3,180 @@
 #include <time.h>
 #include <sys/timeb.h>
 
-#define EMPTY	-2	// ì•„ë¬´ê²ƒë„ ì—†ëŠ” ë¹ˆê³µê°„ (ë²½ ì™¸ë¶€)
-#define WALL	-1	// ë²½							can't
-#define TILE	0	// ì˜¤ë¸Œì íŠ¸ ì—†ëŠ” ë¹ˆ íƒ€ì¼		can
-#define BOX		1	// ìƒì				moveable	can't
-#define SLAB	2	// ë°œíŒ				fixed		can
-#define HOUSE	3	// ì§‘				fixed		can't
-#define SPEAR	4	// ì°½				fixed		can
-#define THRON	5	// ê°€ì‹œ				fixed		can
-#define KEY		6	// ì—´ì‡ 				fixed		can
-#define TREASURE 7	// ë³´ë¬¼ìƒì			fixed		flexible
-#define ROCK	8	// ëŒ				movable		can't
-#define EXIT    9   // íƒˆì¶œêµ¬           fixed       can't
+
+#define EMPTY	-2	// ¾Æ¹«°Íµµ ¾ø´Â ºó°ø°£ (º® ¿ÜºÎ)
+#define WALL	-1	// º®							can't
+#define TILE	0	// ¿ÀºêÁ§Æ® ¾ø´Â ºó Å¸ÀÏ		can
+#define BOX		1	// »óÀÚ				moveable	can't
+#define SLAB	2	// ¹ßÆÇ				fixed		can
+#define HOUSE	3	// Áı				fixed		can't
+#define SPEAR	4	// Ã¢				fixed		can
+#define THRON	5	// °¡½Ã				fixed		can
+#define KEY		6	// ¿­¼è				fixed		can
+#define TREASURE 7	// º¸¹°»óÀÚ			fixed		flexible
+#define ROCK	8	// µ¹				movable		can't
+#define EXIT    9   // Å»Ãâ±¸           fixed       can't
 #define PLAYER	10	// player				
-#define FULL    12  //ìƒìì™€ ë°œíŒì´ ê²¹ì³ì ¸ ìˆëŠ” ìƒí™©
+#define FULL    12  //»óÀÚ¿Í ¹ßÆÇÀÌ °ãÃÄÁ® ÀÖ´Â »óÈ²
+
+#define BOARD_X_PIX	50	// º¸µå ÇÑÄ­ÀÇ ÇÈ¼¿³Êºñ
+#define BOARD_Y_PIX 50	// º¸µå ÇÑÄ­ÀÇ ÇÈ¼¿³ôÀÌ
+#define BOARD_X_NUM 10	// º¸µå ÀüÃ¼ °¡·Î Ä­¼ö
+#define BOARD_Y_NUM 10	// º¸µå ÀüÃ¼ ¼¼·Î Ä­¼ö
+
+#define TOTAL_STAGE_NUM		10	// ÃÑ ½ºÅ×ÀÌÁö °¹¼ö
+#define TOTAL_OBJECT_TYPE	11	// ¿ÀºêÁ§Æ® Á¾·ù °¹¼ö +1
 
 
-#define BOARD_X_PIX	50	// ë³´ë“œ í•œì¹¸ì˜ í”½ì…€ë„ˆë¹„
-#define BOARD_Y_PIX 50	// ë³´ë“œ í•œì¹¸ì˜ í”½ì…€ë†’ì´
-#define BOARD_X_NUM 10	// ë³´ë“œ ì „ì²´ ê°€ë¡œ ì¹¸ìˆ˜
-#define BOARD_Y_NUM 10	// ë³´ë“œ ì „ì²´ ì„¸ë¡œ ì¹¸ìˆ˜
-
-#define TOTAL_STAGE_NUM		20	// ì´ ìŠ¤í…Œì´ì§€ ê°¯ìˆ˜
-#define TOTAL_OBJECT_TYPE	11	// ì˜¤ë¸Œì íŠ¸ ì¢…ë¥˜ ê°¯ìˆ˜ +1
-
-
-struct ObjectStruct{ 
-	char x; 
-    char y;
-	char type;
-};
+struct ObjectStruct { char x; char y; char type; };
 
 SceneID sceneStage[TOTAL_STAGE_NUM];
-ObjectID tile[TOTAL_STAGE_NUM][BOARD_Y_NUM][BOARD_X_NUM];	// ë²½ê³¼ ë°”ë‹¥(íƒ€ì¼) ì˜¤ë¸Œì íŠ¸.
-/*ObjectID fixedObject[TOTAL_STAGE_NUM][100];
-ObjectID movableObject[TOTAL_STAGE_NUM][100];*/
+SceneID selectStage, clearStage;
+ObjectID tile[TOTAL_STAGE_NUM][BOARD_Y_NUM][BOARD_X_NUM];	// º®°ú ¹Ù´Ú(Å¸ÀÏ) ¿ÀºêÁ§Æ®.
 ObjectID object[TOTAL_STAGE_NUM][TOTAL_OBJECT_TYPE][30];
 ObjectStruct objectStruct[TOTAL_STAGE_NUM][TOTAL_OBJECT_TYPE][30];
 ObjectID player[TOTAL_STAGE_NUM];
+ObjectID stageButton[TOTAL_STAGE_NUM];
+ObjectID backButton[TOTAL_STAGE_NUM];
+ObjectID quitbutton;
 
-// ìŠ¤í…Œì´ì§€ êµ¬ì„±
+SoundID bgm, blocked, clearsound, oneclear; //ºê±İ, ¸·ÇûÀ» ¶§ ¼Ò¸®, Å¬¸®¾î¼Ò¸®
+
+
+// ½ºÅ×ÀÌÁö ±¸¼º
 char initBoard[TOTAL_STAGE_NUM][BOARD_Y_NUM][BOARD_X_NUM] = {
-	// STAGE 0
-{	{-2,-2,-2,-2,-1,-1,-1,-1,-1,-2},
-	{-2,-2,-1,-1,-1, 0, 0, 0,-1,-2},
-	{-2,-1,-1, 0, 0, 0, 0, 0,-1,-2},
-	{-1, 0, 0, 0, 0, 0, 0, 0,-1,-2},
-	{-1, 0, 0, 0, 0, 0, 0, 0,-1,-2},
-	{-1, 0, 0, 0, 0, 0, 0, 0,-1,-2},
-	{-1, 0, 0, 0, 0, 0, 0, 0,-1,-2},
-	{-1, 0, 0, 0, 0, 0, 0, 0,-1,-2},
-	{-1,10, 0, 0, 0, 0, 0, 0,-1,-2},
-	{-1,-1,-1,-1,-1,-1,-1,-1,-1,-2} },
-	// STAGE 1
-{	{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},
-	{-1, 0, 0, 0, 0, 0, 0, 0, 0,-1},
-	{-1, 0, 0, 0, 0, 2, 0, 2, 0,-1},
-	{-1, 0, 0, 0, 1, 0, 1, 0, 0,-1},
-	{-1, 0, 0, 0, 0, 0, 0, 0, 0,-1},
-	{-1, 0, 0, 0, 0, 0, 0, 0, 0,-1},
-	{-1, 0, 0, 0, 0, 0, 0, 0, 0,-1},
-	{-1, 0, 0, 0, 0, 0, 0, 0, 0,-1},
-	{-1,10, 0, 0, 0, 0, 0, 0, 0,-1},
-	{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} },
-	//STAGE 2 (ì´ì„ì£¼ê°€ ì˜¬ë¦° ì²«ë²ˆì§¸ ì‚¬ì§„)
-{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
-	{-2,-1,-1,-1,-1,-1,-2,-2,-2,-2},//9
-	{-2,-1, 0, 0, 0,-1,-1,-1,-1,-2},//8
-	{-2,-1, 0, 0, 0,-1, 0, 0,-1,-2},//7
-	{-2,-1,-1, 0, 0, 0, 0, 2,-1,-2},//6
-	{-1,-1,-1, 0,-1,-1,-1, 2,-1,-2},//5
-	{-1, 0, 1, 0,-1,-2,-1, 2,-1,-2},//4
-	{-1, 0, 1, 1,-1,-2,-1,-1,-1,-2},//3
-	{-1,10, 0, 0,-1,-2,-2,-2,-2,-2},//2
-	{-1,-1,-1,-1,-1,-2,-2,-2,-2,-2} },//1
-	//STAGE 3 (ë‘ë²ˆì§¸ ì‚¬ì§„)
-{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
-	{-2,-1,-1,-1,-1,-1,-1,-1,-1,-2},//9
-	{-2,-1, 9, 0, 0, 2, 0, 0,-1,-2},//8
-	{-2,-1, 1, 0,12, 1, 1, 2,-1,-2},//7
-	{-2,-1, 0,-1, 0, 2, 0,-1,-1,-2},//6
-	{-2,-1, 2,-1,-1, 1, 0,-1,-2,-2},//5
-	{-2,-1,-1,-1, 0, 1, 2,-1,-2,-2},//4
-	{-2,-1, 2,10, 1, 0, 0,-1,-2,-2},//3
-	{-2,-1,-1,-1, 0, 0, 0,-1,-2,-2},//2
-	{-2,-2,-2,-1,-1,-1,-1,-1,-2,-2} },//1
-	//STAGE 4(ì„¸ë²ˆì§¸ ì‚¬ì§„)
-{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
-	{-2,-2,-2,-2,-1,-1,-1,-2,-2,-2},//9
-	{-2,-2,-2,-2,-1, 2,-1,-2,-2,-2},//8
-	{-2,-1,-1,-1,-1, 1,-1,-2,-2,-2},//7
-	{-2,-1, 2, 0, 1,10,-1,-1,-1,-2},//6
-	{-2,-1,-1,-1, 1, 0, 1, 2,-1,-2},//5
-	{-2,-2,-2,-1, 0,-1,-1,-1,-1,-2},//4
-	{-2,-2,-2,-1, 2,-1,-2,-2,-2,-2},//3
-	{-2,-2,-2,-1,-1,-1,-2,-2,-2,-2},//2
-	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },//1
-	//STAGE 5(ë„¤ë²ˆì§¸ ì‚¬ì§„)
-{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
-	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//9
-	{-2,-1,-1,-1,-1,-1,-1,-1,-1,-2},//8
-	{-1,-1, 2, 2,-1, 0, 0, 0,-1,-2},//7
-	{-1, 0, 2, 2,-1, 0, 1, 0,-1,-1},//6
-	{-1, 0,10, 0, 1, 0, 0, 1, 0,-1},//5
-	{-1,-1, 1,-1,-1,-1, 0, 0, 0,-1},//4
-	{-2,-1, 0, 0, 0, 0, 0,-1,-1,-1},//3
-	{-2,-1,-1,-1,-1,-1,-1,-1,-2,-2},//2
-	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },//1
-	//STAGE 6(ë‹¤ì„¯ë²ˆì§¸ ì‚¬ì§„)
-{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
-	{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},//9
-	{-1, 2, 2, 2, 2, 2, 0, 0,-1,-2},//8
-	{-1,-1,-1, 0, 1, 0,-1, 0,-1,-1},//7
-	{-2,-2,-1, 0, 1,-1,-1, 0, 0,-1},//6
-	{-2,-2,-1, 1, 0, 1, 0, 1, 0,-1},//5
-	{-2,-2,-1, 0, 0, 0,-1, 0, 0,-1},//4
-	{-2,-2,-1,-1, 0, 0,-1, 0,10,-1},//3
-	{-2,-2,-2,-1,-1,-1,-1,-1,-1,-1},//2
-	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },//1
-	//STAGE 7(ì—¬ì„¯ë²ˆì§¸ ì‚¬ì§„)
-{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
-	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//9
-	{-2,-2,-2,-2,-1,-1,-1,-1,-2,-2},//8
-	{-2,-1,-1,-1,-1, 0, 0,-1,-2,-2},//7
-	{-2,-1, 0, 1, 2, 2, 2,-1,-1,-2},//6
-	{-2,-1,10, 0, 1, 2, 2, 0,-1,-2},//5
-	{-2,-1,-1,-1, 1, 1, 1, 0,-1,-2},//4
-	{-2,-2,-2,-1, 0, 0, 0, 0,-1,-2},//3
-	{-2,-2,-2,-1,-1,-1,-1,-1,-1,-2},//2
-	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },//1
-	//STAGE(ì¼ê³±ë²ˆì§¸ ì‚¬ì§„) ì´ê±´ ê°€ë¡œê°€ 10ë³´ë‹¤ ì»¤ì„œ ì¼ë‹¨ ì¤„ì˜€ì–´ìš”
-{   {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},//10
-	{-1, 0,-1,-1,-1,-1,-1,-1, 0,-1},//9
-	{-1, 1,-1,-1,-1,-1,-1,-1, 0,-1},//8
-	{-1, 0, 0, 0, 0, 0, 0, 0, 0,-1},//7
-	{-1, 0,-1,-1,-1,-1,-1,-1, 0, 0},//6
-	{ 0, 2,-1,-2,-2,-1, 0, 1, 0,-1},//5
-	{ 0, 1,-1,-1,-1,-1, 2,-1, 0,-1},//4
-	{ 2,10, 0, 0,11, 0, 0, 1, 0,-1},//3
-	{ 2, 3, 1, 0, 0,-1, 0, 0, 0,-1},//2
-	{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} }//1
+
+		// STAGE 0
+	{	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},
+		{-2,-2,-2,-2,-2,-1,-1,-1,-1,-2},
+		{-1,-1,-1,-1,-1,-1, 0, 0,-1,-2},
+		{-1, 2, 2, 0, 1, 0, 1, 0,-1,-1},
+		{-1, 2, 2, 1, 0, 1, 0, 0,10,-1},
+		{-1,-1, 2, 0, 1,-1,-1, 0,-1,-1},
+		{-2,-1,-1,-1, 0, 0, 0, 0,-1,-2},
+		{-2,-2,-2,-1,-1,-1,-1,-1,-1,-2},
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },
+
+		// STAGE 1
+	{	{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},
+		{-1, 0, 0, 0, 0, 0,-1, 0,10, 0},
+		{-1, 0, 1, 0, 0, 1, 0, 0, 1, 0},
+		{-1,-1, 0,-1, 2, 2, 2,-1, 0,-1},
+		{-2,-1, 0,-1, 2, 2, 2,-1, 0,-1},
+		{-2,-1, 1, 0,-1,-1,-1, 0, 1,-1},
+		{-2,-1, 0, 0, 0, 1, 0, 0, 0,-1},
+		{-2,-1, 0, 0,-1,-1, 0, 0, 0,-1},
+		{-2,-1,-1,-1,-1,-1,-1,-1,-1,-1},
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },
+
+		//STAGE 2 (ÀÌ¼®ÁÖ°¡ ¿Ã¸° Ã¹¹øÂ° »çÁø)
+	{	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
+		{-2,-1,-1,-1,-1,-1,-2,-2,-2,-2},//9
+		{-2,-1, 0, 0, 0,-1,-1,-1,-1,-2},//8
+		{-2,-1, 0, 0, 0,-1, 0, 0,-1,-2},//7
+		{-2,-1,-1, 0, 0, 0, 0, 2,-1,-2},//6
+		{-1,-1,-1, 0,-1,-1,-1, 2,-1,-2},//5
+		{-1, 0, 1, 0,-1,-2,-1, 2,-1,-2},//4
+		{-1, 0, 1, 1,-1,-2,-1,-1,-1,-2},//3
+		{-1,10, 0, 0,-1,-2,-2,-2,-2,-2},//2
+		{-1,-1,-1,-1,-1,-2,-2,-2,-2,-2} },//1
+	//STAGE 3 (µÎ¹øÂ° »çÁø)
+	{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
+		{-2,-1,-1,-1,-1,-1,-1,-1,-1,-2},//9
+		{-2,-1, 0, 0, 0, 2, 0, 0,-1,-2},//8
+		{-2,-1, 1, 0,12, 1, 1, 2,-1,-2},//7
+		{-2,-1, 0,-1, 0, 2, 0,-1,-1,-2},//6
+		{-2,-1, 2,-1,-1, 1, 0,-1,-2,-2},//5
+		{-2,-1,-1,-1, 0, 1, 2,-1,-2,-2},//4
+		{-2,-1, 2,10, 1, 0, 0,-1,-2,-2},//3
+		{-2,-1,-1,-1, 0, 0, 0,-1,-2,-2},//2
+		{-2,-2,-2,-1,-1,-1,-1,-1,-2,-2} },//1
+		//STAGE 4(¼¼¹øÂ° »çÁø)
+	{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
+		{-2,-2,-2,-2,-1,-1,-1,-2,-2,-2},//9
+		{-2,-2,-2,-2,-1, 2,-1,-2,-2,-2},//8
+		{-2,-1,-1,-1,-1, 1,-1,-2,-2,-2},//7
+		{-2,-1, 2, 0, 1,10,-1,-1,-1,-2},//6
+		{-2,-1,-1,-1, 1, 0, 1, 2,-1,-2},//5
+		{-2,-2,-2,-1, 0,-1,-1,-1,-1,-2},//4
+		{-2,-2,-2,-1, 2,-1,-2,-2,-2,-2},//3
+		{-2,-2,-2,-1,-1,-1,-2,-2,-2,-2},//2
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },//1
+		//STAGE 5(³×¹øÂ° »çÁø)
+	{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//9
+		{-2,-1,-1,-1,-1,-1,-1,-1,-1,-2},//8
+		{-1,-1, 2, 2,-1, 0, 0, 0,-1,-2},//7
+		{-1, 0, 2, 2,-1, 0, 1, 0,-1,-1},//6
+		{-1, 0,10, 0, 1, 0, 0, 1, 0,-1},//5
+		{-1,-1, 1,-1,-1,-1, 0, 0, 0,-1},//4
+		{-2,-1, 0, 0, 0, 0, 0,-1,-1,-1},//3
+		{-2,-1,-1,-1,-1,-1,-1,-1,-2,-2},//2
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },//1
+		//STAGE 6(´Ù¼¸¹øÂ° »çÁø)
+	{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
+		{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},//9
+		{-1, 2, 2, 2, 2, 2, 0, 0,-1,-2},//8
+		{-1,-1,-1, 0, 1, 0,-1, 0,-1,-1},//7
+		{-2,-2,-1, 0, 1,-1,-1, 0, 0,-1},//6
+		{-2,-2,-1, 1, 0, 1, 0, 1, 0,-1},//5
+		{-2,-2,-1, 0, 0, 0,-1, 0, 0,-1},//4
+		{-2,-2,-1,-1, 0, 0,-1, 0,10,-1},//3
+		{-2,-2,-2,-1,-1,-1,-1,-1,-1,-1},//2
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },//1
+		//STAGE 7(¿©¼¸¹øÂ° »çÁø)
+	{   {-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//10
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},//9
+		{-2,-2,-2,-2,-1,-1,-1,-1,-2,-2},//8
+		{-2,-1,-1,-1,-1, 0, 0,-1,-2,-2},//7
+		{-2,-1, 0, 1, 2, 2, 2,-1,-1,-2},//6
+		{-2,-1,10, 0, 1, 2, 2, 0,-1,-2},//5
+		{-2,-1,-1,-1, 1, 1, 1, 0,-1,-2},//4
+		{-2,-2,-2,-1, 0, 0, 0, 0,-1,-2},//3
+		{-2,-2,-2,-1,-1,-1,-1,-1,-1,-2},//2
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} },//1
+		//STAGE8 (ÀÏ°ö¹øÂ° »çÁø) ÀÌ°Ç °¡·Î°¡ 10º¸´Ù Ä¿¼­ ÀÏ´Ü ÁÙ¿´¾î¿ä
+	{   {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},//10
+		{-1, 0,-1,-1,-1,-1,-1,-1, 0,-1},//9
+		{-1, 1,-1,-1,-1,-1,-1,-1, 0,-1},//8
+		{-1, 0, 0, 0, 0, 0, 0, 0, 0,-1},//7
+		{-1, 0,-1,-1,-1,-1,-1,-1, 0, 0},//6
+		{ 0, 2,-1,-2,-2,-1, 0, 1, 0,-1},//5
+		{ 0, 1,-1,-1,-1,-1, 2,-1, 0,-1},//4
+		{ 2,10, 0, 0,12, 0, 0, 1, 0,-1},//3
+		{ 2, 2, 1, 0, 0,-1, 0, 0, 0,-1},//2
+		{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} },//1
+	
+		//STAGE 9
+	{	{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2},
+		{-1,-1,-1,-1,-1,-1,-1,-1,-2,-2},
+		{-1, 0, 0,-1, 2,-1, 2,-1,-1,-2},
+		{-1, 0, 1, 2, 1, 2, 0, 2,-1,-2},
+		{-1, 0, 0, 0, 2,-1, 1,-1,-1,-2},
+		{-1,-1,-1,-1, 0, 0, 0,-1,-2,-2},
+		{-2,-2,-2,-1, 1, 1, 1,-1,-2,-2},
+		{-2,-2,-2,-1, 0,10, 0,-1,-2,-2},
+		{-2,-2,-2,-1,-1,-1,-1,-1,-2,-2},
+		{-2,-2,-2,-2,-2,-2,-2,-2,-2,-2} }
 };
-		
+
+
 char curStage;
-char playerX[TOTAL_STAGE_NUM], playerY[TOTAL_STAGE_NUM];	// playerì˜ X, Y ì¢Œí‘œ
+char playerX[TOTAL_STAGE_NUM], playerY[TOTAL_STAGE_NUM];	// playerÀÇ X, Y ÁÂÇ¥
 char dx[4] = { -1, 1, 0, 0 };	// LEFT RIGHT UP DOWN
 char dy[4] = { 0, 0, 1, -1 };
+
+short buttonX[10] = { 160, 360, 560, 760, 960, 160, 360, 560, 760, 960 };     //stage ¹öÆ° xÁÂÇ¥
+short buttonY[10] = { 410, 410, 410, 410, 410, 310, 310, 310, 310, 310 };     //stage ¹öÆ° yÁÂÇ¥
 
 char fixedObjBoard[TOTAL_STAGE_NUM][BOARD_Y_NUM][BOARD_X_NUM];
 char moveableObjBoard[TOTAL_STAGE_NUM][BOARD_Y_NUM][BOARD_X_NUM];
 char numOfObject[TOTAL_STAGE_NUM][TOTAL_OBJECT_TYPE];
 
+bool playing = false;
 
-// í•¨ìˆ˜ëŠ” ì´ë¶€ë¶„ë¶€í„° -------------------------
+// ÇÔ¼ö´Â ÀÌºÎºĞºÎÅÍ -------------------------
 
 short coolX(char boardX) {
 	short x = (1280 - (BOARD_X_NUM * BOARD_X_PIX)) / 2 + (boardX * BOARD_X_PIX);
@@ -168,23 +189,30 @@ short coolY(char boardY) {
 }
 
 char numToASCII(char num) {
-	return num + 48; // ì•„ìŠ¤í‚¤ 48ë²ˆì§¸ : 0
+	return num + 48; // ¾Æ½ºÅ° 48¹øÂ° : 0
 }
 
-ObjectID createObject(const char* imgLocate, SceneID scene, char boardX, char boardY, bool shown) {
-	ObjectID object = createObject(imgLocate);
-	locateObject(object, scene, coolX(boardX), coolY(boardY));
+
+ObjectID createObject(const char* image, SceneID scene, short x, short y, bool shown) {
+	ObjectID object = createObject(image);
+	locateObject(object, scene, x, y);
 	if (shown) {
 		showObject(object);
 	}
 	return object;
 }
 
-// s1 : ìµœëŒ€ ê¸¸ì´ 19, num : 0~9 ìˆ«ì, s2 : ìµœëŒ€ ê¸¸ì´ 9
+ObjectID createObject(const char* imgLocate, SceneID scene, char boardX, char boardY, bool shown) {
+
+	ObjectID object = createObject(imgLocate, scene, coolX(boardX), coolY(boardY), true);	
+	return object;
+}
+
+// s1 : ÃÖ´ë ±æÀÌ 19, num : 0~9 ¼ıÀÚ, s2 : ÃÖ´ë ±æÀÌ 9
 void strcat(char* s1, char num, char* s2) {
 
 	char c = 0;
-	char count = 0;     //ë¬´í•œë£¨í”„ë°©ì§€ìš©
+	char count = 0;     //¹«ÇÑ·çÇÁ¹æÁö¿ë
 	while (true) {
 		count++;
 		c = *s1;
@@ -217,14 +245,15 @@ ObjectID createObject(char objectType, SceneID scene, char boardX, char boardY, 
 	return object;
 }
 
+
 bool isFixedObject(char objectType) {
-	if (objectType == SLAB || objectType == HOUSE || objectType == SPEAR || objectType == THRON || objectType == KEY || objectType == TREASURE || objectType == EXIT)
+	if (objectType == SLAB || objectType == HOUSE || objectType == SPEAR || objectType == THRON || objectType == KEY || objectType == TREASURE || objectType == EXIT || objectType == FULL)
 		return true;
 	return false;
 }
 
-bool isMoveableObject(char objectNum) {
-	if (objectNum == BOX || objectNum == ROCK) {
+bool isMovableObject(char objectType) {
+	if (objectType == BOX || objectType == ROCK || objectType == FULL) {
 		return true;
 	}
 	return false;
@@ -232,19 +261,14 @@ bool isMoveableObject(char objectNum) {
 
 
 
-void initStage(char stageNum) {
-	
-}
-
-
-// ObjectType ì´ ìˆëŠ”ê³³ìœ¼ë¡œ ì›€ì§ì¼ ìˆ˜ ìˆëŠ”ê°€?
+// ObjectType ÀÌ ÀÖ´Â°÷À¸·Î ¿òÁ÷ÀÏ ¼ö ÀÖ´Â°¡?
 bool canMove() {
 
 	return false;
 
 }
 
-// ObjectID ë¥¼ ë°˜í™˜í•˜ëŠ”ê²Œ ì•„ë‹˜. objectStruct[sceneNum][objectType][objectNum] ì—ì„œ ë§ˆì§€ë§‰ê°’ì„ ì°¾ê¸°ìœ„í•œ í•¨ìˆ˜.
+// ObjectID ¸¦ ¹İÈ¯ÇÏ´Â°Ô ¾Æ´Ô. objectStruct[sceneNum][objectType][objectNum] ¿¡¼­ ¸¶Áö¸·°ªÀ» Ã£±âÀ§ÇÑ ÇÔ¼ö.
 char findObjectNum(char sceneNum, char objectType, char x, char y) {
 	for (int i = 0; i < 30; i++) {
 		if (objectStruct[sceneNum][objectType][i].x == x &&
@@ -252,7 +276,7 @@ char findObjectNum(char sceneNum, char objectType, char x, char y) {
 			return i;
 		}			
 	}
-	printf("at func findObjectNum, cant find num\n"); // ì˜¤ë¥˜ë©”ì„¸ì§€
+	printf("at func findObjectNum, cant find num\n"); // ¿À·ù¸Ş¼¼Áö
 	return -1; 
 }
 
@@ -265,7 +289,7 @@ void moveObject(char stageNum, char objectType, char fromX, char fromY, char toX
 		locateObject(object[stageNum][objectType][objNum], sceneStage[stageNum], coolX(toX), coolY(toY));
 	}
 	else {
-		printf("at func moveObject, tried to move unmovable object\n");	//ì˜¤ë¥˜ë©”ì„¸ì§€
+		printf("at func moveObject, tried to move unmovable object\n");	//¿À·ù¸Ş¼¼Áö
 	}
 }
 
@@ -275,56 +299,155 @@ void movePlayer(char stageNum, char toX, char toY) {
 	locateObject(player[stageNum], sceneStage[stageNum], coolX(toX), coolY(toY));
 }
 
+bool isStageClear(char stageNum) {
+	for (char i = 0; i < numOfObject[stageNum][SLAB]; i++) {
+		ObjectStruct objStr = objectStruct[stageNum][SLAB][i];
+		if (moveableObjBoard[stageNum][objStr.y][objStr.x] != BOX) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void initStage(char stageNum) {
+	playing = false;
+	char count[TOTAL_OBJECT_TYPE];
+	for (char i = 0; i < TOTAL_OBJECT_TYPE; i++) {
+		count[i] = 0;
+	}
+	printf("stage %d\n", stageNum);
+	// initPlayer()
+	for (char j = 0; j < BOARD_Y_NUM; j++) {
+		for (char i = 0; i < BOARD_X_NUM; i++) {
+			char objectType = initBoard[stageNum][j][i];
+			if (objectType == PLAYER) {
+				playerX[stageNum] = i; playerY[stageNum] = j;
+			}
+		}
+	}
+	movePlayer(stageNum, playerX[stageNum], playerY[stageNum]);
+	
+	// init movableObjBoard to 0
+	for (char j = 0; j < BOARD_Y_NUM; j++) {
+		for (char i = 0; i < BOARD_X_NUM; i++) {
+			moveableObjBoard[stageNum][i][j] = 0;
+		}
+	}
+
+	// init movableObj
+	for (char j = 0; j < BOARD_Y_NUM; j++) {
+		for (char i = 0; i < BOARD_X_NUM; i++) {
+			char objectType = initBoard[stageNum][j][i];
+			if (objectType == FULL) { objectType = BOX; }
+			if (isMovableObject(objectType)) {
+				printf("%d %d has movable\n", i, j);
+				moveableObjBoard[stageNum][j][i] = objectType;
+				objectStruct[stageNum][objectType][count[objectType]] = { i,j,objectType };
+				locateObject(object[stageNum][objectType][count[objectType]], sceneStage[stageNum], coolX(i), coolY(j));
+								
+				count[objectType]++;
+			}
+		}
+	}
+	printf("Movable Obj Board\n");
+	for (char j = BOARD_Y_NUM - 1; j >= 0; j--) {
+		for (char i = 0; i < BOARD_X_NUM; i++) {
+			printf("%d ", moveableObjBoard[3][j][i]);
+		}
+		printf("\n");
+	}
+
+	playing = true;
+}
+
 // 
 void move(char keycode) {
 	char code = keycode - 82;	// LEFT : 0, RIGHT : 1, UP : 2, DOWN : 3
-	char mPlayerX = playerX[curStage] + dx[code];	// ì´ë™í•  ê³³
+	char mPlayerX = playerX[curStage] + dx[code];	// ÀÌµ¿ÇÒ °÷
 	char mPlayerY = playerY[curStage] + dy[code];
 	char mvObjType = moveableObjBoard[curStage][mPlayerY][mPlayerX];
 	char fxObjType = fixedObjBoard[curStage][mPlayerY][mPlayerX];
 	
 	
-	// ê°€ë ¤ëŠ”ê³³ì´ ë°•ìŠ¤ë©´
+	// °¡·Á´Â°÷ÀÌ ¹Ú½º¸é
 	if (mvObjType == BOX) {		
-		// ê·¸ ë‹¤ìŒì¹¸ì´ ë°•ìŠ¤ê°€ ì›€ì§ì¼ ìˆ˜ ìˆëŠ” ê³³ì¸ì§€ í™•ì¸í•˜ê³ 
+		// ±× ´ÙÀ½Ä­ÀÌ ¹Ú½º°¡ ¿òÁ÷ÀÏ ¼ö ÀÖ´Â °÷ÀÎÁö È®ÀÎÇÏ°í
 		char mBoxX = mPlayerX + dx[code];
 		char mBoxY = mPlayerY + dy[code];
 		char mvObjTypeB = moveableObjBoard[curStage][mBoxY][mBoxX];
 		char fxObjTypeB = fixedObjBoard[curStage][mBoxY][mBoxX];
-		// movableTypeì´ ì´ë¯¸ ìˆëŠ” ê³³ì´ë©´ ëª»ê°
+		// movableTypeÀÌ ÀÌ¹Ì ÀÖ´Â °÷ÀÌ¸é ¸ø°¨
 		if (mvObjTypeB > 0) {			
-			// TODO : ëª»ì›€ì§ì„ì„ í‘œí˜„í•˜ëŠ” ë­”ê°€ê°€ ìˆìœ¼ë©´ ì¢‹ê² ìŒ.
-			// ì˜ˆë¥¼ë“¤ë©´ ì‚ë¹… ì†Œë¦¬ê°€ ë‚˜ê±°ë‚˜, ì›€ì§ì¼ ìˆ˜ ì—†ìŠµë‹ˆë‹¤! í•˜ê³  ì•Œë ¤ì£¼ê±°ë‚˜
-			// noticeCantMove() ? 
+			// TODO : ¸ø¿òÁ÷ÀÓÀ» Ç¥ÇöÇÏ´Â ¹º°¡°¡ ÀÖÀ¸¸é ÁÁ°ÚÀ½.
+			
+			//¸·ÇûÀ» ¶§ ¼Ò¸®³ªµµ·Ï ¸¸µê.
+			playSound(blocked, false);
 			return;
 		}
-		// fixedì¤‘ ë²½ì´ë©´ ëª»ê°
+		// fixedÁß º®ÀÌ¸é ¸ø°¨
 		if (fxObjTypeB == WALL || fxObjTypeB == TREASURE) {			
-			// noticeCantMove() ? 
+			playSound(blocked, false);
 			return;
 		}
-		//ìƒì ì›€ì§ì„		
+		//»óÀÚ ¿òÁ÷ÀÓ		
 		moveObject(curStage, BOX, mPlayerX, mPlayerY, mBoxX, mBoxY);
 	}
 	else if (fxObjType == WALL) {
 		return;
 	}
-	//TODO ì—´ì‡ ì—†ëŠ” ìƒíƒœë©´ TREASUREë„ ëª»ì§€ë‚˜ê°€ê²Œ í•´ì•¼í•¨.
+	//TODO ¿­¼è¾ø´Â »óÅÂ¸é TREASUREµµ ¸øÁö³ª°¡°Ô ÇØ¾ßÇÔ.
 
 	movePlayer(curStage, mPlayerX, mPlayerY);
+
+	if (isStageClear(curStage)) {
+		playing = false;
+		curStage++;
+		if (curStage < TOTAL_STAGE_NUM)
+		{
+			//¼º°ø½Ã stageButtonÀ» clearÀÌ¹ÌÁö·Î º¯°æ
+			setObjectImage(stageButton[curStage-1], "Images/clear.png");
+			enterScene(selectStage);
+			playing = true;
+			playSound(oneclear, false);
+		}
+		else if (curStage == TOTAL_STAGE_NUM) {
+			//¸ğµÎ ¼º°ø½Ã ½ºÅ×ÀÌÁö Å¬¸®¾î È­¸éÀ¸·Î °¡µµ·Ï ¸¸µê.
+			enterScene(clearStage);
+			stopSound(bgm);
+			playSound(clearsound);
+		}
+	}
 }
 
 
+void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
+	for (int i = 0; i < TOTAL_STAGE_NUM; i++) {
+		if (object == stageButton[i]) {
+			curStage = i;
+			enterScene(sceneStage[i]);
+			playing = true;
+		}
+		else if (object == backButton[i]) {
+			playing = false;
+			initStage(curStage);
+			enterScene(selectStage);			
+		}
+		
+	}
+	if (object == quitbutton) {
+		endGame();
+	}
+}
 
 void keyboardCallback(KeyCode code, KeyState state)
 {
-	// ëˆ„ë¥´ëŠ” ë™ì‘ì—ë§Œ ë°˜ì‘. ë–¼ëŠ”ê²ƒì—” ë°˜ì‘ X
-	if (state == KeyState::KEYBOARD_PRESSED) {
-		if (code >= 82 && code <= 85) {		// UP
+	// ´©¸£´Â µ¿ÀÛ¿¡¸¸ ¹İÀÀ. ¶¼´Â°Í¿£ ¹İÀÀ X
+	if (state == KeyState::KEYBOARD_PRESSED && playing && 0<=curStage && curStage<TOTAL_STAGE_NUM) {
+		if (code >= 82 && code <= 85) {		// ¹æÇâÅ°
 			move(code);
 
 		}
-		else if (code == 75) {
+		else if (code == 75 || code == 18) {	// SPACEBAR or 'R'
 			initStage(curStage);
 		}
 		else {
@@ -334,29 +457,49 @@ void keyboardCallback(KeyCode code, KeyState state)
 
 }
 
-void IsStageClear(char stageNum) {
-	
-}
 
-
-// ë©”ì¸í•¨ìˆ˜
+// ¸ŞÀÎÇÔ¼ö
 int main() {
 
 	setKeyboardCallback(keyboardCallback);
+	setMouseCallback(mouseCallback);
 
-	sceneStage[0] = createScene("ì†Œì½”ë°˜", "Images/Background.png");
-	sceneStage[1] = createScene("ì†Œì½”ë°˜", "Images/Background.png");
-	sceneStage[3] = createScene("ì†Œì½”ë°˜", "Images/Background.png");
+	bgm = createSound("sounds/¼ÒÄÚ¹İ ºê±İ.mp3");  //ºê±İ ¹«ÇÑ¹İº¹
+	playSound(bgm, true);
+
+	blocked = createSound("sounds/ºÎµúÈ÷´Â ¼Ò¸®.mp3");
+
+	clearsound = createSound("sounds/Å¬¸®¾î ¼Ò¸®.mp3");
+
+	oneclear = createSound("sounds/ÇÑ °³ Å¬¸®¾î.mp3");
+
+	selectStage = createScene("½ºÅ×ÀÌÁö ¼±ÅÃ", "Images/Background.png");
+	clearStage = createScene("½ºÅ×ÀÌÁö Å¬¸®¾î", "Images/stageclear.png");
+
+	stageButton[0] = createObject("Images/Button0.png", selectStage, (short)buttonX[0], (short)buttonY[0], true);
+	for (char n = 1; n < TOTAL_STAGE_NUM; n++) {
+		char s1[20] = "Images/Button";
+		char s2[10] = ".png";
+		strcat(s1, n, s2);		
+		stageButton[n] = createObject(s1, selectStage, (short)buttonX[n], (short)buttonY[n], true);				
+	}
 
 
-	// n : ìŠ¤í…Œì´ì§€ ë²ˆí˜¸,	j : yì„±ë¶„,	i : xì„±ë¶„
-	for (char n = 0; n < 4; n++) {
+
+	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
+		sceneStage[n] = createScene("¼ÒÄÚ¹İ", "Images/Background.png");
+		backButton[n] = createObject("Images/Back.png", sceneStage[n], (short)100, (short)610, true);
+	}
+
+
+	// n : ½ºÅ×ÀÌÁö ¹øÈ£,	j : y¼ººĞ,	i : x¼ººĞ
+	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
 		for (char j = 0; j < BOARD_Y_NUM; j++) {
 			for (char i = 0; i < BOARD_X_NUM; i++) {
 				char objectType = initBoard[n][j][i];
 				
 				if (objectType == EMPTY)	continue;
-				// ë²½ê³¼ ë°”ë‹¥ ë§Œë“¤ê¸°		
+				// º®°ú ¹Ù´Ú ¸¸µé±â		
 				if (objectType == WALL) {
 					tile[n][j][i] = createObject("Images/Wall.png", sceneStage[n], i, j, true);
 
@@ -365,7 +508,11 @@ int main() {
 				else {
 					tile[n][j][i] = createObject("Images/Tile.png", sceneStage[n], i, j, true);		
 
-					if (isFixedObject(objectType)) {
+					if (objectType == FULL) {
+						fixedObjBoard[n][j][i] = SLAB;
+						moveableObjBoard[n][j][i] = BOX;
+					}
+					else if (isFixedObject(objectType)) {
 						fixedObjBoard[n][j][i] = objectType;
 					}
 					else if (objectType == PLAYER) {
@@ -378,67 +525,41 @@ int main() {
 			}
 		}
 	}
-
-	// ë°œíŒë§Œë“¤ê¸° -> todo : fixedObject ë§Œë“¤ê¸°
-	for (char n = 0; n < 4; n++) {
-		char count = 0;
-		for (char j = 0; j < BOARD_Y_NUM; j++) {
-			for (char i = 0; i < BOARD_X_NUM; i++) {
-				if (fixedObjBoard[n][j][i] == SLAB) {       
-					object[n][SLAB][count] = createObject(SLAB, sceneStage[n], i, j, true);
-					objectStruct[n][SLAB][count] = { i, j, SLAB };
-					count++;
-				}
-			}
+	printf("Fixed Obj Board\n");
+	for (char j = BOARD_Y_NUM-1; j >=0 ; j--) {
+		for (char i = 0; i < BOARD_X_NUM; i++) {
+			printf("%d ", fixedObjBoard[3][j][i]);
 		}
+		printf("\n");
 	}
-
-	// íƒˆì¶œêµ¬ ë§Œë“¤ê¸°
-	for (char n = 0; n < 4; n++) {
-		char count = 0;
-		for (char j = 0; j < BOARD_Y_NUM; j++) {
-			for (char i = 0; i < BOARD_X_NUM; i++) {
-				if (fixedObjBoard[n][j][i] == EXIT) {
-					object[n][EXIT][count] = createObject(EXIT, sceneStage[n], i, j, true);
-					objectStruct[n][EXIT][count] = { i, j, EXIT };
-					count++;
-				}
-			}
+	printf("Movable Obj Board\n");
+	for (char j = BOARD_Y_NUM - 1; j >= 0; j--) {
+		for (char i = 0; i < BOARD_X_NUM; i++) {			
+			printf("%d ", moveableObjBoard[3][j][i]);
 		}
-	}
-
-	// ë°•ìŠ¤ë§Œë“¤ê¸° -> todo : movableObject ë§Œë“¤ê¸°
-	for (char n = 0; n < 4; n++) {
-		char count = 0;
-		for (char j = 0; j < BOARD_Y_NUM; j++) {
-			for (char i = 0; i < BOARD_X_NUM; i++) {
-				if (moveableObjBoard[n][j][i] == BOX ) { 
-					object[n][BOX][count] = createObject(BOX, sceneStage[n], i, j, true);
-					objectStruct[n][BOX][count] = { i, j, BOX };
-					count++;
-				}
-			}
-		}
+		printf("\n");
 	}
 
 	
-	// player ë§Œë“¤ê¸°
-	for (char n = 0; n < 4; n++) {
-		player[n] = createObject("Images/Player.png", sceneStage[n], playerX[n], playerY[n], true);
-	}
 
-	// ìŠ¤í…Œì´ì§€ë³„ íƒ€ì…ë³„ ì˜¤ë¸Œì íŠ¸ ì´ ê°œìˆ˜
-	for (char n = 0; n < 2; n++) {
+	// ¿ÀºêÁ§Æ®¸¸µé±â
+	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
 		for (char j = 0; j < BOARD_Y_NUM; j++) {
 			for (char i = 0; i < BOARD_X_NUM; i++) {
-				char fxObjType = fixedObjBoard[n][j][i];
-				char mvObjType = moveableObjBoard[n][j][i];
+				char fxObjType = fixedObjBoard[n][j][i];				
 				if (isFixedObject(fxObjType)) {
 					object[n][fxObjType][numOfObject[n][fxObjType]] = createObject(fxObjType, sceneStage[n], i, j, true);
-					objectStruct[n][fxObjType][numOfObject[n][fxObjType]] = { i, j, fxObjType };
+					objectStruct[n][fxObjType][numOfObject[n][fxObjType]] = { i, j, fxObjType};
 					numOfObject[n][fxObjType] += 1;
-				}
-				else if (isMoveableObject(mvObjType)) {
+				}								
+			}
+		}
+	}
+	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
+		for (char j = 0; j < BOARD_Y_NUM; j++) {
+			for (char i = 0; i < BOARD_X_NUM; i++) {				
+				char mvObjType = moveableObjBoard[n][j][i];
+				if (isMovableObject(mvObjType)) {
 					object[n][mvObjType][numOfObject[n][mvObjType]] = createObject(mvObjType, sceneStage[n], i, j, true);
 					objectStruct[n][mvObjType][numOfObject[n][mvObjType]] = { i, j, mvObjType };
 					numOfObject[n][mvObjType] += 1;
@@ -447,8 +568,20 @@ int main() {
 		}
 	}
 
-	curStage = 3;
-	startGame(sceneStage[3]);
 
+	
+	
+	// player ¸¸µé±â
+	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
+		player[n] = createObject("Images/Player.png", sceneStage[n], playerX[n], playerY[n], true);
+	}
+
+	quitbutton = createObject("Images/quit.png");
+	locateObject(quitbutton, clearStage, 505, 130);
+	showObject(quitbutton);
+
+	playing = false;
+	curStage = 0;
+	startGame(selectStage);
 }
 
