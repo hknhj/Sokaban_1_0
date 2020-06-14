@@ -1,21 +1,18 @@
 #include <stdio.h>
 #include <bangtal.h>
-#include <time.h>
-#include <sys/timeb.h>
-
 
 #define EMPTY	-2	// 아무것도 없는 빈공간 (벽 외부)
-#define WALL	-1	// 벽							can't
-#define TILE	0	// 오브젝트 없는 빈 타일		can
-#define BOX		1	// 상자				moveable	can't
-#define SLAB	2	// 발판				fixed		can
-#define HOUSE	3	// 집				fixed		can't
-#define SPEAR	4	// 창				fixed		can
-#define THRON	5	// 가시				fixed		can
-#define KEY		6	// 열쇠				fixed		can
-#define TREASURE 7	// 보물상자			fixed		flexible
-#define ROCK	8	// 돌				movable		can't
-#define EXIT    9   // 탈출구           fixed       can't
+#define WALL	-1	// 벽							
+#define TILE	0	// 오브젝트 없는 빈 타일		
+#define BOX		1	// 상자				moveable	
+#define SLAB	2	// 발판				fixed		
+#define HOUSE	3	// 집				fixed		
+#define SPEAR	4	// 창				fixed		
+#define THRON	5	// 가시				fixed		
+#define KEY		6	// 열쇠				fixed		
+#define TREASURE 7	// 보물상자			fixed		
+#define ROCK	8	// 돌				movable		
+#define EXIT    9   // 탈출구           fixed      
 #define PLAYER	10	// player				
 #define FULL    12  //상자와 발판이 겹쳐져 있는 상황
 
@@ -31,14 +28,14 @@
 struct ObjectStruct { char x; char y; char type; };
 
 SceneID sceneStage[TOTAL_STAGE_NUM];
-SceneID selectStage, clearStage;
+SceneID selectStage, clearStage, startpage;
 ObjectID tile[TOTAL_STAGE_NUM][BOARD_Y_NUM][BOARD_X_NUM];	// 벽과 바닥(타일) 오브젝트.
 ObjectID object[TOTAL_STAGE_NUM][TOTAL_OBJECT_TYPE][30];
 ObjectStruct objectStruct[TOTAL_STAGE_NUM][TOTAL_OBJECT_TYPE][30];
 ObjectID player[TOTAL_STAGE_NUM];
 ObjectID stageButton[TOTAL_STAGE_NUM];
 ObjectID backButton[TOTAL_STAGE_NUM];
-ObjectID quitbutton;
+ObjectID quitbutton, startpagebox, startbutton;
 
 SoundID bgm, blocked, clearsound, oneclear; //브금, 막혔을 때 소리, 클리어소리
 
@@ -173,8 +170,8 @@ char playerX[TOTAL_STAGE_NUM], playerY[TOTAL_STAGE_NUM];	// player의 X, Y 좌표
 char dx[4] = { -1, 1, 0, 0 };	// LEFT RIGHT UP DOWN
 char dy[4] = { 0, 0, 1, -1 };
 
-short buttonX[10] = { 160, 360, 560, 760, 960, 160, 360, 560, 760, 960 };     //stage 버튼 x좌표
-short buttonY[10] = { 410, 410, 410, 410, 410, 310, 310, 310, 310, 310 };     //stage 버튼 y좌표
+short buttonX[10] = { 120, 340, 560, 780, 1000, 120, 340, 560, 780, 1000 };     //stage 버튼 x좌표
+short buttonY[10] = { 450, 450, 450, 450, 450, 280, 280, 280, 280, 280 };     //stage 버튼 y좌표
 
 char fixedObjBoard[TOTAL_STAGE_NUM][BOARD_Y_NUM][BOARD_X_NUM];
 char moveableObjBoard[TOTAL_STAGE_NUM][BOARD_Y_NUM][BOARD_X_NUM];
@@ -199,7 +196,7 @@ char numToASCII(char num) {
 	return num + 48; // 아스키 48번째 : 0
 }
 
-
+// 타입 2 : 이미지 파일 경로와 픽셀좌표로 오브젝트만들기
 ObjectID createObject(const char* image, SceneID scene, short x, short y, bool shown) {
 	ObjectID object = createObject(image);
 	locateObject(object, scene, x, y);
@@ -209,13 +206,14 @@ ObjectID createObject(const char* image, SceneID scene, short x, short y, bool s
 	return object;
 }
 
+// 타입 3 : 이미지파일 경로와 보드좌표로 오브젝트만들기
 ObjectID createObject(const char* imgLocate, SceneID scene, char boardX, char boardY, bool shown) {
 
-	ObjectID object = createObject(imgLocate, scene, coolX(boardX), coolY(boardY), true);	
+	ObjectID object = createObject(imgLocate, scene, coolX(boardX), coolY(boardY), true);
 	return object;
 }
 
-// s1 : 최대 길이 19, num : 0~9 숫자, s2 : 최대 길이 9
+// 문자열 s1 + 숫자 num + 문자열 s2 를 이어붙여 s1에 저장하기. s1 : 최대 길이 19, num : 0~9 숫자, s2 : 최대 길이 9
 void strcat(char* s1, char num, char* s2) {
 
 	char c = 0;
@@ -244,7 +242,8 @@ void strcat(char* s1, char num, char* s2) {
 	*s1 = NULL;
 }
 
-ObjectID createObject(char objectType, SceneID scene, char boardX, char boardY, bool shown) {	
+// 타입4 : objectTyep과 보드좌표로 오브젝트 만들기
+ObjectID createObject(char objectType, SceneID scene, char boardX, char boardY, bool shown) {
 	char s1[20] = "Images/Object";
 	char s2[10] = ".png";
 	strcat(s1, objectType, s2);
@@ -252,17 +251,20 @@ ObjectID createObject(char objectType, SceneID scene, char boardX, char boardY, 
 	return object;
 }
 
+// 파란색(발판 위에 올려진)박스 이미지로 박스만들기
 ObjectID createCleardBox(SceneID scene, char boardX, char boardY, bool shown) {
 	ObjectID object = createObject("Images/Object1c.png", scene, boardX, boardY, shown);
 	return object;
 }
 
+// fixed 오브젝트인가?
 bool isFixedObject(char objectType) {
 	if (objectType == SLAB || objectType == HOUSE || objectType == SPEAR || objectType == THRON || objectType == KEY || objectType == TREASURE || objectType == EXIT || objectType == FULL)
 		return true;
 	return false;
 }
 
+// movable 오브젝트인가?
 bool isMovableObject(char objectType) {
 	if (objectType == BOX || objectType == ROCK || objectType == FULL) {
 		return true;
@@ -272,30 +274,23 @@ bool isMovableObject(char objectType) {
 
 
 
-// ObjectType 이 있는곳으로 움직일 수 있는가?
-bool canMove() {
-
-	return false;
-
-}
-
 // ObjectID 를 반환하는게 아님. objectStruct[sceneNum][objectType][objectNum] 에서 마지막값을 찾기위한 함수.
 char findObjectNum(char sceneNum, char objectType, char x, char y) {
 	for (int i = 0; i < 30; i++) {
 		if (objectStruct[sceneNum][objectType][i].x == x &&
 			objectStruct[sceneNum][objectType][i].y == y) {
 			return i;
-		}			
+		}
 	}
-	printf("at func findObjectNum, cant find num\n"); // 오류메세지
-	return -1; 
+	return -1;
 }
 
+// stageNum의 objectType의 (fromX, formY)에 현재 있는 오브젝트를 잡아서 (toX, toY)로 옮김
 void moveObject(char stageNum, char objectType, char fromX, char fromY, char toX, char toY, bool onSlab) {
 	if (objectType == BOX || objectType == ROCK) {
 		char objNum = findObjectNum(stageNum, objectType, fromX, fromY);
 		moveableObjBoard[stageNum][fromY][fromX] = 0;
-		moveableObjBoard[stageNum][toY][toX] = objectType;		
+		moveableObjBoard[stageNum][toY][toX] = objectType;
 		objectStruct[stageNum][objectType][objNum] = { toX, toY, objectType };
 		locateObject(object[stageNum][objectType][objNum], sceneStage[stageNum], coolX(toX), coolY(toY));
 		if (onSlab) {
@@ -305,18 +300,16 @@ void moveObject(char stageNum, char objectType, char fromX, char fromY, char toX
 			setObjectImage(object[stageNum][objectType][objNum], "Images/Object1.png");
 		}
 	}
-	else {
-		printf("at func moveObject, tried to move unmovable object\n");	//오류메세지
-	}
-	
 }
 
+// stageNum 의 플레이어를 보드좌표 toX, toY로 옮김
 void movePlayer(char stageNum, char toX, char toY) {
 	playerX[stageNum] = toX;
 	playerY[stageNum] = toY;
 	locateObject(player[stageNum], sceneStage[stageNum], coolX(toX), coolY(toY));
 }
 
+// 스테이지 클리어 조건 확인
 bool isStageClear(char stageNum) {
 	for (char i = 0; i < numOfObject[stageNum][SLAB]; i++) {
 		ObjectStruct objStr = objectStruct[stageNum][SLAB][i];
@@ -327,15 +320,16 @@ bool isStageClear(char stageNum) {
 	return true;
 }
 
+// 스테이지 초기화
 void initStage(char stageNum) {
-	
-	setObjectImage(player[stageNum],"Images/Player3.png");
+
+	// 플레이어가 앞을 보게
+	setObjectImage(player[stageNum], "Images/Player3.png");
 
 	char count[TOTAL_OBJECT_TYPE];
 	for (char i = 0; i < TOTAL_OBJECT_TYPE; i++) {
 		count[i] = 0;
 	}
-	printf("stage %d\n", stageNum);
 	// initPlayer()
 	for (char j = 0; j < BOARD_Y_NUM; j++) {
 		for (char i = 0; i < BOARD_X_NUM; i++) {
@@ -346,7 +340,7 @@ void initStage(char stageNum) {
 		}
 	}
 	movePlayer(stageNum, playerX[stageNum], playerY[stageNum]);
-	
+
 	// init movableObjBoard to 0
 	for (char j = 0; j < BOARD_Y_NUM; j++) {
 		for (char i = 0; i < BOARD_X_NUM; i++) {
@@ -367,7 +361,6 @@ void initStage(char stageNum) {
 				count[objectType]++;
 			}
 			else if (isMovableObject(objectType)) {
-				printf("%d %d has movable\n", i, j);
 				moveableObjBoard[stageNum][j][i] = objectType;
 				objectStruct[stageNum][objectType][count[objectType]] = { i,j,objectType };
 				locateObject(object[stageNum][objectType][count[objectType]], sceneStage[stageNum], coolX(i), coolY(j));
@@ -376,15 +369,6 @@ void initStage(char stageNum) {
 			}
 		}
 	}
-	printf("Movable Obj Board\n");
-	for (char j = BOARD_Y_NUM - 1; j >= 0; j--) {
-		for (char i = 0; i < BOARD_X_NUM; i++) {
-			printf("%d ", moveableObjBoard[curStage][j][i]);
-		}
-		printf("\n");
-	}
-	printf("box num : %d\n", numOfObject[curStage][BOX]);
-		
 }
 
 // 
@@ -395,35 +379,34 @@ void move(char keycode) {
 	char mvObjType = moveableObjBoard[curStage][mPlayerY][mPlayerX];
 	char fxObjType = fixedObjBoard[curStage][mPlayerY][mPlayerX];
 
-	// 이미 클리어 한 경우
-	if (stageCleared[curStage]) return;
+
 
 	// 플레이어 바라보는 방향 바꾸기
 	char s1[20] = "Images/Player";
 	char s2[10] = ".png";
 	strcat(s1, code, s2);
 	setObjectImage(player[curStage], s1);
-	
+
 	// 맵 벗어날 수 없음
 	if (mPlayerX < 0 || mPlayerX >= BOARD_X_NUM || mPlayerY < 0 || mPlayerY >= BOARD_Y_NUM) {
 		playSound(blocked, false);
-		return ;
+		return;
 	}
 
 	// 가려는곳이 박스면
-	if (mvObjType == BOX) {		
+	if (mvObjType == BOX) {
 		// 그 다음칸이 박스가 움직일 수 있는 곳인지 확인하고
 		char mBoxX = mPlayerX + dx[code];
 		char mBoxY = mPlayerY + dy[code];
 		char mvObjTypeB = moveableObjBoard[curStage][mBoxY][mBoxX];
 		char fxObjTypeB = fixedObjBoard[curStage][mBoxY][mBoxX];
 		// movableType이 이미 있는 곳이면 못감
-		if (mvObjTypeB > 0) {			
+		if (mvObjTypeB > 0) {
 			playSound(blocked, false);
 			return;
 		}
 		// fixed중 벽이면 못감
-		if (fxObjTypeB == WALL || fxObjTypeB == TREASURE) {			
+		if (fxObjTypeB == WALL || fxObjTypeB == TREASURE) {
 			playSound(blocked, false);
 			return;
 		}
@@ -438,8 +421,8 @@ void move(char keycode) {
 		playSound(blocked, false);
 		return;
 	}
-	//TODO 열쇠없는 상태면 TREASURE도 못지나가게 해야함.
 
+	//플레이어 움직이기
 	movePlayer(curStage, mPlayerX, mPlayerY);
 
 
@@ -449,48 +432,53 @@ void move(char keycode) {
 		playing = false;
 		stageCleared[curStage] = true;
 		setObjectImage(stageButton[curStage], "Images/clear.png");
-		enterScene(selectStage);		
-		
+		enterScene(selectStage);
+
 		bool allCleard = true;
 		for (int i = 0; i < TOTAL_STAGE_NUM; i++) {
-			if (stageCleared[i] == false) allCleard = false;			
+			if (stageCleared[i] == false) allCleard = false;
 		}
 		if (allCleard) {
 			enterScene(clearStage);
 			stopSound(bgm);
 			playSound(clearsound);
-		}			
+		}
 	}
 }
 
 
 void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 	for (int i = 0; i < TOTAL_STAGE_NUM; i++) {
+		// 스테이지 버튼을 누르면 해당 스테이지로 들어감
 		if (object == stageButton[i]) {
-			if (stageCleared[i] == false) {
-				curStage = i;
-				enterScene(sceneStage[i]);
-				playing = true;
-			}			
+			curStage = i;
+			initStage(curStage);
+			enterScene(sceneStage[i]);
+			playing = true;
+
 		}
+		// 스테이지 선택 버튼을 누르면 선택화면으로 나옴
 		else if (object == backButton[i]) {
 			playing = false;
-			initStage(curStage);
-			enterScene(selectStage);			
+			enterScene(selectStage);
 		}
-		
+
 	}
+	// 종료버튼 누르면 게임끝냄
 	if (object == quitbutton) {
 		endGame();
+	}
+	else if (object == startbutton) {
+		enterScene(selectStage);
 	}
 }
 
 void keyboardCallback(KeyCode code, KeyState state)
 {
 	// 누르는 동작에만 반응. 떼는것엔 반응 X
-	if (state == KeyState::KEYBOARD_PRESSED && playing && 0<=curStage && curStage<TOTAL_STAGE_NUM) {
-		if (code >= 82 && code <= 85) {		// 방향키
-			printf("%d\n", playing);
+	// playing 중이어야 반응
+	if (state == KeyState::KEYBOARD_PRESSED && playing && 0 <= curStage && curStage < TOTAL_STAGE_NUM) {
+		if (code >= 82 && code <= 85) {		// 방향키			
 			move(code);
 
 		}
@@ -499,13 +487,9 @@ void keyboardCallback(KeyCode code, KeyState state)
 			initStage(curStage);
 			playing = true;
 		}
-		else if (code == 59) {
+		else if (code == 59) {	// ESC
+			playing = false;
 			enterScene(selectStage);
-			initStage(curStage);
-		}
-		
-		else {
-			printf("undefined keycode : %d\n", code);
 		}
 	}
 
@@ -518,49 +502,59 @@ int main() {
 	setKeyboardCallback(keyboardCallback);
 	setMouseCallback(mouseCallback);
 
-	bgm = createSound("sounds/소코반 브금.mp3");  //브금 무한반복
+	bgm = createSound("Sounds/BGM.mp3");  //브금 무한반복
 	playSound(bgm, true);
 
-	blocked = createSound("sounds/부딪히는 소리.mp3");
+	blocked = createSound("Sounds/Blocked.mp3");
 
-	clearsound = createSound("sounds/클리어 소리.mp3");
+	clearsound = createSound("Sounds/AllClear.mp3");
 
-	oneclear = createSound("sounds/한 개 클리어.mp3");
+	oneclear = createSound("Sounds/StageClear.mp3");
 
 	selectStage = createScene("스테이지 선택", "Images/Background.png");
 	clearStage = createScene("스테이지 클리어", "Images/stageclear.png");
+	startpage = createScene("시작 화면", "Images/Background.png");
 
+	startpagebox = createObject("Images/소코반 시작 화면.png");
+	locateObject(startpagebox, startpage, 494, 300);
+	showObject(startpagebox);
+
+	startbutton = createObject("Images/startbutton.png");
+	locateObject(startbutton, startpage, 505, 130);
+	showObject(startbutton);
+
+	// 스테이지 선택 버튼 구성
 	stageButton[0] = createObject("Images/Button0.png", selectStage, (short)buttonX[0], (short)buttonY[0], true);
 	for (char n = 1; n < TOTAL_STAGE_NUM; n++) {
 		char s1[20] = "Images/Button";
 		char s2[10] = ".png";
-		strcat(s1, n, s2);		
-		stageButton[n] = createObject(s1, selectStage, (short)buttonX[n], (short)buttonY[n], true);				
+		strcat(s1, n, s2);
+		stageButton[n] = createObject(s1, selectStage, (short)buttonX[n], (short)buttonY[n], true);
 	}
 
 
-
+	// 스테이지 씬 및 버튼구성
 	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
-		sceneStage[n] = createScene("소코반", "Images/Background.png");
-		backButton[n] = createObject("Images/Back.png", sceneStage[n], (short)100, (short)610, false);
+		sceneStage[n] = createScene("소코반", "Images/Background3.png");
+		backButton[n] = createObject("Images/Back.png", sceneStage[n], (short)50, (short)580, true);
 	}
 
-
+	// initBorad 정보를 통해 벽과 바닥 오브젝트 만들고, fixed 보드, movable 보드 만들기
 	// n : 스테이지 번호,	j : y성분,	i : x성분
 	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
 		for (char j = 0; j < BOARD_Y_NUM; j++) {
 			for (char i = 0; i < BOARD_X_NUM; i++) {
 				char objectType = initBoard[n][j][i];
-				
+
 				if (objectType == EMPTY)	continue;
-				// 벽과 바닥 만들기		
+				// 벽과 바닥 오브젝트(tile) 만들기		
 				if (objectType == WALL) {
 					tile[n][j][i] = createObject("Images/Wall.png", sceneStage[n], i, j, true);
 
-					fixedObjBoard[n][j][i] = objectType;					
+					fixedObjBoard[n][j][i] = objectType;
 				}
 				else {
-					tile[n][j][i] = createObject("Images/Tile.png", sceneStage[n], i, j, true);		
+					tile[n][j][i] = createObject("Images/Tile.png", sceneStage[n], i, j, true);
 
 					if (objectType == FULL) {
 						fixedObjBoard[n][j][i] = SLAB;
@@ -572,59 +566,38 @@ int main() {
 					else if (objectType == PLAYER) {
 						playerX[n] = i; playerY[n] = j;
 					}
-					else{
+					else {
 						moveableObjBoard[n][j][i] = objectType;
 					}
-				}								
+				}
 			}
 		}
 	}
-	printf("Fixed Obj Board\n");
-	for (char j = BOARD_Y_NUM-1; j >=0 ; j--) {
-		for (char i = 0; i < BOARD_X_NUM; i++) {
-			printf("%d ", fixedObjBoard[8][j][i]);
-		}
-		printf("\n");
-	}
-	printf("Movable Obj Board\n");
-	for (char j = BOARD_Y_NUM - 1; j >= 0; j--) {
-		for (char i = 0; i < BOARD_X_NUM; i++) {			
-			printf("%d ", moveableObjBoard[8][j][i]);
-		}
-		printf("\n");
-	}
 
-	
-
-	// 오브젝트만들기
+	// fixed 오브젝트만들기
 	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
 		for (char j = 0; j < BOARD_Y_NUM; j++) {
 			for (char i = 0; i < BOARD_X_NUM; i++) {
-				char fxObjType = fixedObjBoard[n][j][i];				
+				char fxObjType = fixedObjBoard[n][j][i];
 				if (isFixedObject(fxObjType)) {
 					object[n][fxObjType][numOfObject[n][fxObjType]] = createObject(fxObjType, sceneStage[n], i, j, true);
-					objectStruct[n][fxObjType][numOfObject[n][fxObjType]] = { i, j, fxObjType};
+					objectStruct[n][fxObjType][numOfObject[n][fxObjType]] = { i, j, fxObjType };
 					numOfObject[n][fxObjType] += 1;
-				}								
+				}
 			}
 		}
 	}
+	// movable 오브젝트 만들기
 	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
 		for (char j = 0; j < BOARD_Y_NUM; j++) {
 			for (char i = 0; i < BOARD_X_NUM; i++) {
 				char mvObjType = moveableObjBoard[n][j][i];
 				if (mvObjType == FULL) {
-					if (n == 8) {
-						printf("has FULL\n");
-					}
 					moveableObjBoard[n][j][i] = BOX;
 					mvObjType = BOX;
 					object[n][mvObjType][numOfObject[n][mvObjType]] = createCleardBox(sceneStage[n], i, j, true);
 					objectStruct[n][mvObjType][numOfObject[n][mvObjType]] = { i, j, mvObjType };
 					numOfObject[n][mvObjType] += 1;
-					if (n == 8) {
-						printf("%d type %d\n", mvObjType, numOfObject[n][mvObjType]);
-					}
 				}
 				else if (isMovableObject(mvObjType)) {
 					object[n][mvObjType][numOfObject[n][mvObjType]] = createObject(mvObjType, sceneStage[n], i, j, true);
@@ -634,32 +607,18 @@ int main() {
 			}
 		}
 	}
-	printf("Movable Obj Board\n");
-	for (char j = BOARD_Y_NUM - 1; j >= 0; j--) {
-		for (char i = 0; i < BOARD_X_NUM; i++) {
-			printf("%d ", moveableObjBoard[8][j][i]);
-		}
-		printf("\n");
-	}
-	for (char i = 0; i < TOTAL_STAGE_NUM; i++) {
-		printf("%d stage has box : %d\n", i+1, numOfObject[i][BOX]);
-	}
-	
 
-	
-	
 	// player 만들기
 	for (char n = 0; n < TOTAL_STAGE_NUM; n++) {
 		player[n] = createObject("Images/Player3.png", sceneStage[n], playerX[n], playerY[n], true);
 	}
 
+	// 종료버튼
 	quitbutton = createObject("Images/quit.png");
 	locateObject(quitbutton, clearStage, 505, 130);
 	showObject(quitbutton);
-		
 
 	playing = false;
 	curStage = 0;
-	startGame(selectStage);
+	startGame(startpage);
 }
-

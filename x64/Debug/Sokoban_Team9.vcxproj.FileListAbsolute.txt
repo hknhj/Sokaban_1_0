@@ -1,0 +1,2 @@
+C:\Users\VS7550 Spectrometer\source\repos\Sokoban_Team9\x64\Debug\Sokoban_Team9.exe
+C:\Users\VS7550 Spectrometer\source\repos\Sokoban_Team9\x64\Debug\Sokoban_Team9.pdb
